@@ -1,0 +1,211 @@
+/* Listing Title: Missing Efficacy Follow Up visit based on Imaging/Disease assessment_1
+   Scenario 1: Output if Next Trial Period = Continuing into Adrenal Recovery Assessment/Efficacy Follow-up,
+   expected Efficacy FU visit (based on imaging schedule from Randomization) is missing in the window,
+   and EDRA is missing OR completed after the expected timepoint.
+*/
+
+SELECT
+  s.Site        AS `Site`,
+  s.SubjName    AS `Participant`,
+  s.DSSDATE     AS `DSETP Date of Discontinuation`,
+  s.DSSTERM     AS `Status at End of Trial Period`,
+  s.DS_Next_Trial_Per AS `Next Trial Period`,
+  s.RND_Date    AS `Randomization/Allocation Date`,
+  s.TRIG_TREAT  AS `Treatment and Observation Selection`,
+
+  /* Expected timeframe instead of "Efficacy Follow-Up X" */
+  CONCAT(CAST(x.ExpWinStart AS DATE), ' - ', CAST(x.ExpWinEnd AS DATE)) AS `Expected Visit`
+
+FROM
+(
+  SELECT
+    a.Site,
+    a.SubjName,
+    a.SubjID,
+    a.DSSDATE,
+    a.DSSTERM,
+    a.DS_Next_Trial_Per,
+    b.RND_Date,
+    d.TRIG_TREAT,
+    e.EDRA_Date
+  FROM
+    /* DSETP */
+    (
+      SELECT
+        @HDR.Site.Number  AS Site,
+        @HDR.Subject.Name AS SubjName,
+        @HDR.Subject.ID   AS SubjID,
+        DSETP_DSSTDAT     AS DSSDATE,
+        DSETP_DSTERM      AS DSSTERM,
+        DSETP_O_DSNEXT    AS DS_Next_Trial_Per
+      FROM EDC.DSETP
+      WHERE @Form.Status = 'submitted__v'
+        AND DSETP_O_DSNEXT = 'ADRENAL RECOVERY ASSESSMENT/EFFICACY FOLLOW-UP'
+    ) a
+
+    /* DSRND */
+    LEFT JOIN
+    (
+      SELECT
+        @HDR.Subject.ID AS SubjID,
+        MIN(DSRND_DSSTDAT) AS RND_Date
+      FROM EDC.DSRND
+      WHERE @Form.Status = 'submitted__v'
+        AND DSRND_DSSTDAT IS NOT NULL
+      GROUP BY @HDR.Subject.ID
+    ) b
+      ON a.SubjID = b.SubjID
+
+    /* TRIG */
+    LEFT JOIN
+    (
+      SELECT
+        @HDR.Subject.ID AS SubjID,
+        MAX(TRIG_O_SCARM) AS TRIG_TREAT
+      FROM EDC.TRIG
+      WHERE @Form.Status = 'submitted__v'
+      GROUP BY @HDR.Subject.ID
+    ) d
+      ON a.SubjID = d.SubjID
+
+    /* EDRA stop marker (ONLY from EDRA visit/event; adjust event name if needed) */
+    LEFT JOIN
+    (
+      SELECT
+        @HDR.Subject.ID AS SubjID,
+        MIN(@HDR.Event.Date) AS EDRA_Date
+      FROM EDC.DSEDRA
+      WHERE @Form.Status = 'submitted__v'
+        AND @HDR.Event.Name = 'EDRA'
+      GROUP BY @HDR.Subject.ID
+    ) e
+      ON a.SubjID = e.SubjID
+) s,
+
+/* Expected imaging-based FU schedule from Randomization */
+(
+  /* FU1: week 8 => 56 days +/-7 => (49,63) */
+  SELECT r.SubjID, r.RND_Date + 49 AS ExpWinStart, r.RND_Date + 63 AS ExpWinEnd
+  FROM (
+    SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+    FROM EDC.DSRND
+    WHERE @Form.Status = 'submitted__v'
+      AND DSRND_DSSTDAT IS NOT NULL
+  ) r
+
+  UNION ALL
+  /* FU2: week 16 => 112 +/-7 => (105,119) */
+  SELECT r.SubjID, r.RND_Date + 105, r.RND_Date + 119
+  FROM (
+    SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+    FROM EDC.DSRND
+    WHERE @Form.Status = 'submitted__v'
+      AND DSRND_DSSTDAT IS NOT NULL
+  ) r
+
+  UNION ALL
+  /* FU3: week 24 => 168 +/-7 => (161,175) */
+  SELECT r.SubjID, r.RND_Date + 161, r.RND_Date + 175
+  FROM (
+    SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+    FROM EDC.DSRND
+    WHERE @Form.Status = 'submitted__v'
+      AND DSRND_DSSTDAT IS NOT NULL
+  ) r
+
+  UNION ALL
+  /* FU4: week 32 => 224 +/-7 => (217,231) */
+  SELECT r.SubjID, r.RND_Date + 217, r.RND_Date + 231
+  FROM (
+    SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+    FROM EDC.DSRND
+    WHERE @Form.Status = 'submitted__v'
+      AND DSRND_DSSTDAT IS NOT NULL
+  ) r
+
+  UNION ALL
+  /* FU5: week 40 => 280 +/-7 => (273,287) */
+  SELECT r.SubjID, r.RND_Date + 273, r.RND_Date + 287
+  FROM (
+    SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+    FROM EDC.DSRND
+    WHERE @Form.Status = 'submitted__v'
+      AND DSRND_DSSTDAT IS NOT NULL
+  ) r
+
+  UNION ALL
+  /* FU6: week 48 => 336 +/-7 => (329,343) */
+  SELECT r.SubjID, r.RND_Date + 329, r.RND_Date + 343
+  FROM (
+    SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+    FROM EDC.DSRND
+    WHERE @Form.Status = 'submitted__v'
+      AND DSRND_DSSTDAT IS NOT NULL
+  ) r
+
+  UNION ALL
+  /* FU7: week 60 => 420 +/-7 => (413,427) */
+  SELECT r.SubjID, r.RND_Date + 413, r.RND_Date + 427
+  FROM (
+    SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+    FROM EDC.DSRND
+    WHERE @Form.Status = 'submitted__v'
+      AND DSRND_DSSTDAT IS NOT NULL
+  ) r
+
+  UNION ALL
+  /* FU8: week 72 => 504 +/-7 => (497,511) */
+  SELECT r.SubjID, r.RND_Date + 497, r.RND_Date + 511
+  FROM (
+    SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+    FROM EDC.DSRND
+    WHERE @Form.Status = 'submitted__v'
+      AND DSRND_DSSTDAT IS NOT NULL
+  ) r
+
+  UNION ALL
+  /* FU9: week 84 => 588 +/-7 => (581,595) */
+  SELECT r.SubjID, r.RND_Date + 581, r.RND_Date + 595
+  FROM (
+    SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+    FROM EDC.DSRND
+    WHERE @Form.Status = 'submitted__v'
+      AND DSRND_DSSTDAT IS NOT NULL
+  ) r
+
+  UNION ALL
+  /* FU10: week 96 => 672 +/-7 => (665,679) */
+  SELECT r.SubjID, r.RND_Date + 665, r.RND_Date + 679
+  FROM (
+    SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+    FROM EDC.DSRND
+    WHERE @Form.Status = 'submitted__v'
+      AND DSRND_DSSTDAT IS NOT NULL
+  ) r
+) x
+
+WHERE
+  /* replaces ON clause */
+  s.SubjID = x.SubjID
+
+  AND s.RND_Date IS NOT NULL
+  AND s.DSSDATE IS NOT NULL
+  AND s.TRIG_TREAT IN ('0011','0012','0013','0015','0016')
+
+  /* FU windows expected AFTER DSETP discontinuation date */
+  AND x.ExpWinStart > s.DSSDATE
+
+  /* EDRA missing OR completed AFTER the expected timepoint */
+  AND (s.EDRA_Date IS NULL OR s.EDRA_Date > x.ExpWinEnd)
+
+  /* Missing expected visit: no DSEDRA record in the window */
+  AND NOT EXISTS (
+    SELECT 1
+    FROM EDC.DSEDRA
+    WHERE @Form.Status = 'submitted__v'
+      AND @HDR.Subject.ID = s.SubjID
+      AND @HDR.Event.Date >= x.ExpWinStart
+      AND @HDR.Event.Date <= x.ExpWinEnd
+  )
+
+ORDER BY `Site`, `Participant`, x.ExpWinStart
