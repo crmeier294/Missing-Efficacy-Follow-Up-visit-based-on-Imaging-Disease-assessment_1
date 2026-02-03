@@ -1,0 +1,267 @@
+The following listing is already programmed in Veeva CDB Workbench. CQL PROGRAMMING LANGUAGE. NOT SQL.
+
+Listing Title: Missing Efficacy Follow Up visit based on Imaging/Disease assessment_1
+
+
+Objective: This report lists subjects that have completed item " Next Trial Period" in ETP form and the expected visit has not been entered based on the lesion evaluation schedule.
+
+
+
+Programming Guide/Notes: 
+"Output is produced if for the selected Next Trial Period on ETP completed as Continuing into Adrenal Recovery Assessment/Efficacy Follow-up, and the <Expected Visit> has not been entered in the expected timepoint based on the Imaging/Disease assessment schedule per protocol and EDRA is missing or had been completed after the expected timepoint.
+
+Expected visits:
+Efficacy Follow-Up 1,2,3,4 and so on... have to be calculated based on imaging timepoints that are:
+every 8 weeks (+/- 7 days) from week 1 to week 48, and every 12 weeks (+/- 7 days) from week 49  following Date of Randomization and the efficacy follow-up visits are expected to start after end of discontunuation visits until the subject has discontinued follow-up phase (EDRA form is completed) and only if a participant continues into Adrenal Recovery Assessment/Efficacy Follow-up and applies for TRIG = 0011,0012,0013,0015,0016"
+
+
+Forms Used: DSETP, DSRND, TRIG, DSEDRA
+
+
+Below is my working CQL code. I need the following subjects/participants to be present in the output, as well as some minor updates to a column. Correctly update this CQL listing from CDB workbench and ensure the below outputs correctly:
+
+
+Subject# 00270077
+For this participant there should be output for missing Efficacy FU visit in timeframe 20Oct2025 - 3Nov2025 and 15Dec2025 - 29Dec2025 (2 rows).
+Next Efficacy FU visit is not expected (timeframe is 9Feb26 – 23Feb26) since DSEDRA is completed on 8Jan26.
+
+Subject# 00270078
+For this participant there should be output for missing Efficacy FU visit in timeframe 15Dec2025 – 29Dec2025. Only entered Efficacy FU visit is 30/Nov/2025 – not in expected timeframe.
+Next Efficacy FU visit is not missing yet since it is expected in timeframe 9Feb26 – 23Feb26 (output should occur if still missing on 24Feb2026).
+
+Subject# 00270079
+For this participant there should be output for missing Efficacy FU visit in timeframe 15Dec2025 – 29Dec2025.
+Next Efficacy FU visit is not missing yet since it is expected in timeframe 9Feb26 – 23Feb26 (output should occur if still missing on 24Feb2026).
+
+Subject# 00270080
+For this participant there should be output for missing Efficacy FU visit in timeframe 15Dec2025 – 29Dec2025. Only entered Efficacy FU visit is 7/Jan/2026 – not in expected timeframe.
+Next Efficacy FU visit is not missing yet since it is expected in timeframe 9Feb26 – 23Feb26 (output should occur if still missing on 24Feb2026).
+
+Subject# 00270081
+For this participant there should be output for missing Efficacy FU visit in timeframe 26Sep2025 – 10Oct2025 and 19Dec2025 – 2Jan2026 (2 rows).
+Next Efficacy FU visit is not missing yet since it is expected in timeframe 13Mar26 – 27Mar26 (output should occur if still missing on 28Mar2026).
+
+Subject# 00270082
+No output is expected. Data entered correctly.
+
+General note:
+In the column "Expected visit" there should be rather expected timeframe provided instead of the event name e.g. 20Oct2025 - 3Nov2025.
+
+
+
+CQL CODE:
+
+/*Scenario 1: Output is produced if for the selected Next Trial Period on ETP completed as Continuing into Adrenal Recovery Assessment/Efficacy Follow-up, and the <Expected Visit> has not been entered in the expected timepoint based on the Imaging/Disease assessment schedule per protocol and EDRA is missing or had been completed after the expected timepoint.*/
+
+SELECT
+  s.Site AS `Site`,
+  s.SubjName AS `Participant`,
+  s.DSSDATE AS `DSETP Date of Discontinuation`,
+  s.DSSTERM     AS `Status at End of Trial Period`,
+  s.DS_Next_Trial_Per AS `Next Trial Period`,
+  s.RND_Date    AS `Randomization/Allocation Date`,
+  s.TRIG_TREAT  AS `Treatment and Observation Selection`,
+  x.ExpVisitLabel AS `Expected Visit`
+--  x.ExpTargetDate AS `Expected Target Date`,
+--  x.ExpWinStart   AS `Expected Window Start`,
+--  x.ExpWinEnd     AS `Expected Window End`,
+/*  (
+    SELECT MIN(@HDR.Event.Date)
+    FROM EDC.DSEDRA
+    WHERE @Form.Status = 'submitted__v'
+      AND @HDR.Subject.ID = s.SubjID
+      AND @HDR.Event.Date >= x.ExpWinStart
+      AND @HDR.Event.Date <= x.ExpWinEnd
+  ) AS `EDRA Date In Window`,
+
+  (
+    SELECT MIN(@HDR.Event.Date)
+    FROM EDC.DSEDRA
+    WHERE @Form.Status = 'submitted__v'
+      AND @HDR.Subject.ID = s.SubjID
+  ) AS `EDRA Earliest Event Date (Stop Marker)`
+*/
+FROM
+(
+  SELECT
+    a.Site,
+    a.SubjName,
+    a.SubjID,
+    a.DSSDATE,
+    a.DSSTERM,
+    a.DS_Next_Trial_Per,
+    b.RND_Date,
+    d.TRIG_TREAT
+  FROM
+    -- DSETP
+    (
+      SELECT
+        @HDR.Site.Number  AS Site,
+        @HDR.Subject.Name AS SubjName,
+        @HDR.Subject.ID   AS SubjID,
+        DSETP_DSSTDAT     AS DSSDATE,
+        DSETP_DSTERM      AS DSSTERM,
+        DSETP_O_DSNEXT    AS DS_Next_Trial_Per
+      FROM EDC.DSETP
+      WHERE @Form.Status = 'submitted__v'
+      AND DSETP_O_DSNEXT = 'ADRENAL RECOVERY ASSESSMENT/EFFICACY FOLLOW-UP'
+    ) a
+
+    -- DSRND
+    LEFT JOIN
+    (
+      SELECT
+        @HDR.Subject.ID AS SubjID,
+        DSRND_DSSTDAT   AS RND_Date
+      FROM EDC.DSRND
+      WHERE @Form.Status = 'submitted__v'
+        AND DSRND_DSSTDAT IS NOT NULL
+    ) b
+      ON a.SubjID = b.SubjID
+
+    -- TRIG
+    LEFT JOIN
+    (
+      SELECT
+        @HDR.Subject.ID AS SubjID,
+        TRIG_O_SCARM    AS TRIG_TREAT
+      FROM EDC.TRIG
+      WHERE @Form.Status = 'submitted__v'
+    ) d
+      ON a.SubjID = d.SubjID
+) s,
+
+
+-- Expected imaging-based FU schedule
+(
+  -- FU1: week 8 => 56 days +/-7 => (49,63)
+  SELECT
+    r.SubjID,
+    'Efficacy Follow-Up 1' AS ExpVisitLabel,
+    r.RND_Date + 56 AS ExpTargetDate,
+    r.RND_Date + 49 AS ExpWinStart,
+    r.RND_Date + 63 AS ExpWinEnd
+  FROM
+    (
+      SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+      FROM EDC.DSRND
+      WHERE @Form.Status = 'submitted__v'
+        AND DSRND_DSSTDAT IS NOT NULL
+    ) r
+
+  UNION ALL
+  -- FU2: week 16 => 112 +/-7 => (105,119)
+  SELECT r.SubjID, 'Efficacy Follow-Up 2',
+    r.RND_Date + 112, r.RND_Date + 105, r.RND_Date + 119
+  FROM
+    (SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+     FROM EDC.DSRND
+     WHERE @Form.Status = 'submitted__v' AND DSRND_DSSTDAT IS NOT NULL) r
+
+  UNION ALL
+  -- FU3: week 24 => 168 +/-7 => (161,175)
+  SELECT r.SubjID, 'Efficacy Follow-Up 3',
+    r.RND_Date + 168, r.RND_Date + 161, r.RND_Date + 175
+  FROM
+    (SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+     FROM EDC.DSRND
+     WHERE @Form.Status = 'submitted__v' AND DSRND_DSSTDAT IS NOT NULL) r
+
+  UNION ALL
+  -- FU4: week 32 => 224 +/-7 => (217,231)
+  SELECT r.SubjID, 'Efficacy Follow-Up 4',
+    r.RND_Date + 224, r.RND_Date + 217, r.RND_Date + 231
+  FROM
+    (SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+     FROM EDC.DSRND
+     WHERE @Form.Status = 'submitted__v' AND DSRND_DSSTDAT IS NOT NULL) r
+
+  UNION ALL
+  -- FU5: week 40 => 280 +/-7 => (273,287)
+  SELECT r.SubjID, 'Efficacy Follow-Up 5',
+    r.RND_Date + 280, r.RND_Date + 273, r.RND_Date + 287
+  FROM
+    (SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+     FROM EDC.DSRND
+     WHERE @Form.Status = 'submitted__v' AND DSRND_DSSTDAT IS NOT NULL) r
+
+  UNION ALL
+  -- FU6: week 48 => 336 +/-7 => (329,343)
+  SELECT r.SubjID, 'Efficacy Follow-Up 6',
+    r.RND_Date + 336, r.RND_Date + 329, r.RND_Date + 343
+  FROM
+    (SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+     FROM EDC.DSRND
+     WHERE @Form.Status = 'submitted__v' AND DSRND_DSSTDAT IS NOT NULL) r
+
+  UNION ALL
+  -- FU7: week 60 (12w after wk48) => 420 +/-7 => (413,427)
+  SELECT r.SubjID, 'Efficacy Follow-Up 7',
+    r.RND_Date + 420, r.RND_Date + 413, r.RND_Date + 427
+  FROM
+    (SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+     FROM EDC.DSRND
+     WHERE @Form.Status = 'submitted__v' AND DSRND_DSSTDAT IS NOT NULL) r
+
+  UNION ALL
+  -- FU8: week 72 => 504 +/-7 => (497,511)
+  SELECT r.SubjID, 'Efficacy Follow-Up 8',
+    r.RND_Date + 504, r.RND_Date + 497, r.RND_Date + 511
+  FROM
+    (SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+     FROM EDC.DSRND
+     WHERE @Form.Status = 'submitted__v' AND DSRND_DSSTDAT IS NOT NULL) r
+
+  UNION ALL
+  -- FU9: week 84 => 588 +/-7 => (581,595)
+  SELECT r.SubjID, 'Efficacy Follow-Up 9',
+    r.RND_Date + 588, r.RND_Date + 581, r.RND_Date + 595
+  FROM
+    (SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+     FROM EDC.DSRND
+     WHERE @Form.Status = 'submitted__v' AND DSRND_DSSTDAT IS NOT NULL) r
+
+  UNION ALL
+  -- FU10: week 96 => 672 +/-7 => (665,679)
+  SELECT r.SubjID, 'Efficacy Follow-Up 10',
+    r.RND_Date + 672, r.RND_Date + 665, r.RND_Date + 679
+  FROM
+    (SELECT @HDR.Subject.ID AS SubjID, DSRND_DSSTDAT AS RND_Date
+     FROM EDC.DSRND
+     WHERE @Form.Status = 'submitted__v' AND DSRND_DSSTDAT IS NOT NULL) r
+) x
+
+WHERE
+  s.SubjID = x.SubjID
+  AND s.RND_Date IS NOT NULL -- rnd exists
+  AND s.TRIG_TREAT IN ('0011','0012','0013','0015','0016')
+  AND s.DSSDATE IS NOT NULL
+  AND x.ExpWinStart > s.DSSDATE -- FU starts after discontinuation visit
+
+  -- stop after subj discontinued FU phase (EDRA completed)
+  AND (
+    (SELECT MIN(@HDR.Event.Date)
+     FROM EDC.DSEDRA
+     WHERE @Form.Status = 'submitted__v'
+       AND @HDR.Subject.ID = s.SubjID
+    ) IS NULL
+    OR
+    x.ExpWinStart <=
+    (SELECT MIN(@HDR.Event.Date)
+     FROM EDC.DSEDRA
+     WHERE @Form.Status = 'submitted__v'
+       AND @HDR.Subject.ID = s.SubjID
+    )
+  )
+
+  -- SCENARIO 1: expected visit not entered in-window (EDRA missing or late)
+  AND NOT EXISTS (
+    SELECT 1
+    FROM EDC.DSEDRA
+    WHERE @Form.Status = 'submitted__v'
+      AND @HDR.Subject.ID = s.SubjID
+      AND @HDR.Event.Date >= x.ExpWinStart
+      AND @HDR.Event.Date <= x.ExpWinEnd
+  )
+
+ORDER BY `Site`,`Participant`
