@@ -1,0 +1,183 @@
+/* Missing Efficacy Follow Up visit based on Imaging/Disease assessment_1 */
+
+SELECT
+  s.Site        AS `Site`,
+  s.SubjName    AS `Participant`,
+  s.DSSDATE     AS `DSETP Date of Discontinuation`,
+  s.DSSTERM     AS `Status at End of Trial Period`,
+  s.DS_Next_Trial_Per AS `Next Trial Period`,
+  s.RND_Date    AS `Randomization/Allocation Date`,
+  s.TRIG_TREAT  AS `Treatment and Observation Selection`,
+
+  /* timeframe (start - end) */
+  CONCAT(
+    CONCAT(CAST(x.ExpWinStart AS DATE), ' - '),
+    CAST(x.ExpWinEnd AS DATE)
+  ) AS `Expected Visit`
+
+  /* Debug (uncomment if needed)
+  , CAST(x.ExpWinStart AS DATE) AS `Expected Window Start`
+  , CAST(x.ExpWinEnd   AS DATE) AS `Expected Window End`
+  , CAST(s.EDRA_Date   AS DATE) AS `EDRA Stop Date`
+  */
+
+FROM
+(
+  SELECT
+    a.Site,
+    a.SubjName,
+    a.SubjID,
+    a.DSSDATE,
+    a.DSSTERM,
+    a.DS_Next_Trial_Per,
+    b.RND_Date,
+    d.TRIG_TREAT,
+    e.EDRA_Date
+  FROM
+    /* DSETP */
+    (
+      SELECT
+        @HDR.Site.Number  AS Site,
+        @HDR.Subject.Name AS SubjName,
+        @HDR.Subject.ID   AS SubjID,
+        DSETP_DSSTDAT     AS DSSDATE,
+        DSETP_DSTERM      AS DSSTERM,
+        DSETP_O_DSNEXT    AS DS_Next_Trial_Per
+      FROM EDC.DSETP
+      WHERE @Form.Status = 'submitted__v'
+        AND DSETP_O_DSNEXT = 'ADRENAL RECOVERY ASSESSMENT/EFFICACY FOLLOW-UP'
+    ) a
+
+    /* DSRND (single date per subject) */
+    LEFT JOIN
+    (
+      SELECT
+        @HDR.Subject.ID AS SubjID,
+        MIN(DSRND_DSSTDAT) AS RND_Date
+      FROM EDC.DSRND
+      WHERE @Form.Status = 'submitted__v'
+        AND DSRND_DSSTDAT IS NOT NULL
+      GROUP BY @HDR.Subject.ID
+    ) b
+      ON a.SubjID = b.SubjID
+
+    /* TRIG */
+    LEFT JOIN
+    (
+      SELECT
+        @HDR.Subject.ID AS SubjID,
+        MAX(TRIG_O_SCARM) AS TRIG_TREAT
+      FROM EDC.TRIG
+      WHERE @Form.Status = 'submitted__v'
+      GROUP BY @HDR.Subject.ID
+    ) d
+      ON a.SubjID = d.SubjID
+
+    /* EDRA stop marker (tolerant) */
+    LEFT JOIN
+    (
+      SELECT
+        @HDR.Subject.ID AS SubjID,
+        MIN(@HDR.Event.Date) AS EDRA_Date
+      FROM EDC.DSEDRA
+      WHERE @Form.Status = 'submitted__v'
+        AND @HDR.Event.Name LIKE '%EDRA%'
+      GROUP BY @HDR.Subject.ID
+    ) e
+      ON a.SubjID = e.SubjID
+) s,
+
+/* Expected imaging-based FU schedule from Randomization */
+(
+  SELECT r.SubjID, 1 AS FU_Num, r.RND_Date + 49  AS ExpWinStart, r.RND_Date + 63  AS ExpWinEnd FROM (
+    SELECT @HDR.Subject.ID AS SubjID, MIN(DSRND_DSSTDAT) AS RND_Date
+    FROM EDC.DSRND
+    WHERE @Form.Status='submitted__v' AND DSRND_DSSTDAT IS NOT NULL
+    GROUP BY @HDR.Subject.ID
+  ) r
+
+  UNION ALL SELECT r.SubjID, 2, r.RND_Date + 105, r.RND_Date + 119 FROM (
+    SELECT @HDR.Subject.ID, MIN(DSRND_DSSTDAT) FROM EDC.DSRND
+    WHERE @Form.Status='submitted__v' AND DSRND_DSSTDAT IS NOT NULL
+    GROUP BY @HDR.Subject.ID
+  ) r
+
+  UNION ALL SELECT r.SubjID, 3, r.RND_Date + 161, r.RND_Date + 175 FROM (
+    SELECT @HDR.Subject.ID, MIN(DSRND_DSSTDAT) FROM EDC.DSRND
+    WHERE @Form.Status='submitted__v' AND DSRND_DSSTDAT IS NOT NULL
+    GROUP BY @HDR.Subject.ID
+  ) r
+
+  UNION ALL SELECT r.SubjID, 4, r.RND_Date + 217, r.RND_Date + 231 FROM (
+    SELECT @HDR.Subject.ID, MIN(DSRND_DSSTDAT) FROM EDC.DSRND
+    WHERE @Form.Status='submitted__v' AND DSRND_DSSTDAT IS NOT NULL
+    GROUP BY @HDR.Subject.ID
+  ) r
+
+  UNION ALL SELECT r.SubjID, 5, r.RND_Date + 273, r.RND_Date + 287 FROM (
+    SELECT @HDR.Subject.ID, MIN(DSRND_DSSTDAT) FROM EDC.DSRND
+    WHERE @Form.Status='submitted__v' AND DSRND_DSSTDAT IS NOT NULL
+    GROUP BY @HDR.Subject.ID
+  ) r
+
+  UNION ALL SELECT r.SubjID, 6, r.RND_Date + 329, r.RND_Date + 343 FROM (
+    SELECT @HDR.Subject.ID, MIN(DSRND_DSSTDAT) FROM EDC.DSRND
+    WHERE @Form.Status='submitted__v' AND DSRND_DSSTDAT IS NOT NULL
+    GROUP BY @HDR.Subject.ID
+  ) r
+
+  /* week49+ every 12w */
+  UNION ALL SELECT r.SubjID, 7, r.RND_Date + 413, r.RND_Date + 427 FROM (
+    SELECT @HDR.Subject.ID, MIN(DSRND_DSSTDAT) FROM EDC.DSRND
+    WHERE @Form.Status='submitted__v' AND DSRND_DSSTDAT IS NOT NULL
+    GROUP BY @HDR.Subject.ID
+  ) r
+
+  UNION ALL SELECT r.SubjID, 8, r.RND_Date + 497, r.RND_Date + 511 FROM (
+    SELECT @HDR.Subject.ID, MIN(DSRND_DSSTDAT) FROM EDC.DSRND
+    WHERE @Form.Status='submitted__v' AND DSRND_DSSTDAT IS NOT NULL
+    GROUP BY @HDR.Subject.ID
+  ) r
+
+  UNION ALL SELECT r.SubjID, 9, r.RND_Date + 581, r.RND_Date + 595 FROM (
+    SELECT @HDR.Subject.ID, MIN(DSRND_DSSTDAT) FROM EDC.DSRND
+    WHERE @Form.Status='submitted__v' AND DSRND_DSSTDAT IS NOT NULL
+    GROUP BY @HDR.Subject.ID
+  ) r
+
+  UNION ALL SELECT r.SubjID, 10, r.RND_Date + 665, r.RND_Date + 679 FROM (
+    SELECT @HDR.Subject.ID, MIN(DSRND_DSSTDAT) FROM EDC.DSRND
+    WHERE @Form.Status='submitted__v' AND DSRND_DSSTDAT IS NOT NULL
+    GROUP BY @HDR.Subject.ID
+  ) r
+) x
+
+WHERE
+  s.SubjID = x.SubjID
+  AND s.RND_Date IS NOT NULL
+  AND s.DSSDATE IS NOT NULL
+  AND s.TRIG_TREAT IN ('0011','0012','0013','0015','0016')
+  AND x.ExpWinStart > s.DSSDATE
+
+  /* do not flag future windows yet (as-of = latest submitted DSEDRA event date) */
+  AND x.ExpWinEnd < (
+    SELECT MAX(@HDR.Event.Date)
+    FROM EDC.DSEDRA
+    WHERE @Form.Status = 'submitted__v'
+  )
+
+  /* EDRA missing OR completed after expected timepoint */
+  AND (s.EDRA_Date IS NULL OR s.EDRA_Date > x.ExpWinEnd)
+
+  /* Missing expected visit in-window */
+  AND NOT EXISTS (
+    SELECT 1
+    FROM EDC.DSEDRA
+    WHERE @Form.Status = 'submitted__v'
+      AND @HDR.Subject.ID = s.SubjID
+      AND @HDR.Event.Date >= x.ExpWinStart
+      AND @HDR.Event.Date <= x.ExpWinEnd
+  )
+
+ORDER BY `Site`, `Participant`, x.ExpWinStart
+;
